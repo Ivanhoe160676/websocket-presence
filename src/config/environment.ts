@@ -1,4 +1,3 @@
-// src/config/environment.ts
 import dotenv from 'dotenv';
 import { cleanEnv, str, port, url } from 'envalid';
 
@@ -10,11 +9,6 @@ export const env = cleanEnv(process.env, {
   NODE_ENV: str({ choices: ['development', 'test', 'production'], default: 'development' }),
   PORT: port({ default: 3000 }),
   HOST: str({ default: '0.0.0.0' }),
-
-  // Firebase
-  FIREBASE_PROJECT_ID: str(),
-  FIREBASE_PRIVATE_KEY: str(),
-  FIREBASE_CLIENT_EMAIL: str(),
 
   // WebSocket
   WS_HEARTBEAT_INTERVAL: str({ default: '30000' }),
@@ -36,10 +30,5 @@ export const config = {
     heartbeatInterval: parseInt(env.WS_HEARTBEAT_INTERVAL, 10),
     allowedOrigins: env.ALLOWED_ORIGINS.split(','),
   },
-  
-  firebase: {
-    projectId: env.FIREBASE_PROJECT_ID,
-    privateKey: env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-    clientEmail: env.FIREBASE_CLIENT_EMAIL,
-  },
+
 } as const;

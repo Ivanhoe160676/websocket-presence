@@ -1,91 +1,58 @@
 // src/index.ts
 import express from 'express';
 import http from 'http';
-import WebSocket from 'ws';
 import cors from 'cors';
 import { config } from './config/environment';
 import logger from './services/logger';
+import { PresenceService } from './core/presence/presence-service';
+import { WebSocketServer } from './core/websocket/websocket-service';
+import { metricsService } from './services/metrics-service';
 
 async function bootstrap() {
   try {
-    // Inicializar Express
     const app = express();
     app.use(cors());
     app.use(express.static('src/public'));
-    
-    // Crear servidor HTTP
-    const server = http.createServer(app);
-    
-    // Configurar WebSocket Server
-    const wss = new WebSocket.Server({ server });
 
-    // Endpoint de salud
+    // Endpoint de métricas
+    app.get('/metrics', async (req, res) => {
+      try {
+        const metrics = await metricsService.getMetrics();
+        res.set('Content-Type', metricsService.contentType);
+        res.send(metrics);
+        
+        // Log para debug
+        logger.debug('Metrics endpoint called');
+      } catch (error) {
+        logger.error('Error serving metrics:', error);
+        res.status(500).send('Error collecting metrics');
+      }
+    });
+
+    // Health check endpoint
     app.get('/health', (req, res) => {
       res.json({
         status: 'OK',
         timestamp: new Date().toISOString(),
-        uptime: process.uptime(),
-        websocket: {
-          clients: wss.clients.size
-        }
+        uptime: process.uptime()
       });
     });
 
-    // WebSocket connection handler
-    wss.on('connection', (ws) => {
-      logger.info('New WebSocket connection established');
+    const server = http.createServer(app);
+    const presenceService = new PresenceService();
+    const wsServer = new WebSocketServer(server, presenceService);
 
-      // Send welcome message
-      ws.send(JSON.stringify({
-        type: 'welcome',
-        message: 'Connected to WebSocket Server',
-        timestamp: new Date().toISOString()
-      }));
-
-      // Handle incoming messages
-      ws.on('message', (message) => {
-        try {
-          const data = JSON.parse(message.toString());
-          logger.info('Received message:', data);
-
-          // Echo the message back
-          ws.send(JSON.stringify({
-            type: 'echo',
-            data,
-            timestamp: new Date().toISOString()
-          }));
-        } catch (error) {
-          logger.error('Error processing message', error as Error);
-        }
-      });
-
-      // Handle client disconnect
-      ws.on('close', () => {
-        logger.info('Client disconnected');
-      });
-    });
-
-    // Start server
     server.listen(config.server.port, config.server.host, () => {
-      logger.success(`Server started successfully on port ${config.server.port}`);
-      logger.info(`Health check available at http://localhost:${config.server.port}/health`);
+      logger.success(`Server running at http://${config.server.host}:${config.server.port}`);
+      logger.info('Available endpoints:');
+      logger.info('- Health check: /health');
+      logger.info('- Metrics: /metrics');
     });
 
   } catch (error) {
-    logger.error('Failed to start server', error as Error);
+    logger.error('Failed to start server:', error);
     process.exit(1);
   }
 }
 
-// Error handlers
-process.on('unhandledRejection', (error: Error) => {
-  logger.error('Unhandled Promise Rejection', error);
-});
-
-process.on('uncaughtException', (error: Error) => {
-  logger.error('Uncaught Exception', error);
-  process.exit(1);
-});
-
-// Start the application
 bootstrap();

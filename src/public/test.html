@@ -46,12 +46,13 @@
         let ws;
 
         function connect() {
-            ws = new WebSocket('ws://localhost:3000');
+            const userId = 'test-user-' + Math.random().toString(36).substr(2, 9);
+            ws = new WebSocket(`ws://localhost:3000?userId=${userId}`);
             
             ws.onopen = () => {
-                document.getElementById('status').textContent = 'Connected';
+                document.getElementById('status').textContent = `Connected (${userId})`;
                 document.getElementById('status').className = 'status connected';
-                addMessage('System', 'Connected to server');
+                addMessage('System', `Connected with ID: ${userId}`);
             };
             
             ws.onclose = () => {

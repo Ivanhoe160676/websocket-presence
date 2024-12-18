@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Presence Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 20px;
+        }
+        .card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .connected { background-color: #d4edda; }
+        .disconnected { background-color: #f8d7da; }
+        #presenceList {
+            height: 300px;
+            overflow-y: auto;
+        }
+        #messageLog {
+            height: 400px;
+            overflow-y: auto;
+            background-color: #f8f9fa;
+            padding: 10px;
+        }
+        .presence-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+        }
+        .presence-item .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 5px;
+        }
+        .status-online { background-color: #28a745; }
+        .status-offline { background-color: #dc3545; }
+        .status-away { background-color: #ffc107; }
+        .status-busy { background-color: #dc3545; }
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        button {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 4px;
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #ccc; }
+        .message { margin: 5px 0; padding: 5px; }
+        .timestamp { color: #666; font-size: 0.8em; }
+    </style>
+</head>
+<body>
+    <h1>WebSocket Presence Test</h1>
+    
+    <div class="container">
+        <div>
+            <div class="card">
+                <h2>Connection Status</h2>
+                <div id="connectionStatus" class="status disconnected">Disconnected</div>
+                <div class="controls">
+                    <input type="text" id="userId" placeholder="Enter user ID" value="user1">
+                    <button onclick="connect()" id="connectBtn">Connect</button>
+                    <button onclick="disconnect()" id="disconnectBtn" disabled>Disconnect</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Presence Status</h2>
+                <div class="controls">
+                    <select id="statusSelect" disabled>
+                        <option value="online">Online</option>
+                        <option value="away">Away</option>
+                        <option value="busy">Busy</option>
+                    </select>
+                    <button onclick="updateStatus()" id="updateStatusBtn" disabled>Update Status</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Online Users</h2>
+                <div id="presenceList"></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Message Log</h2>
+            <div id="messageLog"></div>
+        </div>
+    </div>
+
+    <script>
+        let ws;
+        let heartbeatInterval;
+
+        function connect() {
+            const userId = document.getElementById('userId').value;
+            if (!userId) {
+                alert('Please enter a user ID');
+                return;
+            }
+
+            ws = new WebSocket(`ws://localhost:3000?userId=${userId}`);
+            
+            ws.onopen = () => {
+                updateConnectionStatus(true);
+                startHeartbeat();
+                logMessage('System', 'Connected to server');
+            };
+            
+            ws.onclose = () => {
+                updateConnectionStatus(false);
+                stopHeartbeat();
+                logMessage('System', 'Disconnected from server');
+            };
+            
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                handleMessage(data);
+            };
+            
+            ws.onerror = (error) => {
+                logMessage('Error', 'WebSocket error occurred');
+                console.error('WebSocket error:', error);
+            };
+        }
+
+        function disconnect() {
+            if (ws) {
+                ws.close();
+            }
+        }
+
+        function updateConnectionStatus(connected) {
+            const status = document.getElementById('connectionStatus');
+            const connectBtn = document.getElementById('connectBtn');
+            const disconnectBtn = document.getElementById('disconnectBtn');
+            const statusSelect = document.getElementById('statusSelect');
+            const updateStatusBtn = document.getElementById('updateStatusBtn');
+
+            status.textContent = connected ? 'Connected' : 'Disconnected';
+            status.className = `status ${connected ? 'connected' : 'disconnected'}`;
+            
+            connectBtn.disabled = connected;
+            disconnectBtn.disabled = !connected;
+            statusSelect.disabled = !connected;
+            updateStatusBtn.disabled = !connected;
+        }
+
+        function startHeartbeat() {
+            stopHeartbeat();
+            heartbeatInterval = setInterval(() => {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'heartbeat',
+                        timestamp: new Date().toISOString()
+                    }));
+                }
+            }, 15000);
+        }
+
+        function stopHeartbeat() {
+            if (heartbeatInterval) {
+                clearInterval(heartbeatInterval);
+                heartbeatInterval = null;
+            }
+        }
+
+        function updateStatus() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                alert('Not connected to server');
+                return;
+            }
+
+            const status = document.getElementById('statusSelect').value;
+            ws.send(JSON.stringify({
+                type: 'presence_update',
+                payload: {
+                    status
+                },
+                timestamp: new Date().toISOString()
+            }));
+        }
+
+        function handleMessage(data) {
+        logMessage('Server', JSON.stringify(data, null, 2));
+        
+        if (data.type === 'presence_update') {
+            updatePresenceList(data.payload);
+        }
+    }
+
+        function updatePresenceList(presenceData) {
+            const list = document.getElementById('presenceList');
+            const userId = presenceData.userId;
+            const existing = document.getElementById(`presence-${userId}`);
+            
+            if (existing) {
+                if (presenceData.status === 'offline') {
+                    existing.remove();
+                } else {
+                    updatePresenceItem(existing, presenceData);
+                }
+            } else if (presenceData.status !== 'offline') {
+                const item = createPresenceItem(presenceData);
+                list.appendChild(item);
+            }
+        }
+
+        function createPresenceItem(data) {
+            const div = document.createElement('div');
+            div.id = `presence-${data.userId}`;
+            div.className = 'presence-item';
+            updatePresenceItem(div, data);
+            return div;
+        }
+
+        function updatePresenceItem(element, data) {
+        element.innerHTML = `
+            <span>
+                <span class="status-indicator status-${data.status.toLowerCase()}"></span>
+                ${data.userId}
+            </span>
+            <span>${data.status}</span>
+        `;
+    }
+
+        function logMessage(from, message) {
+            const log = document.getElementById('messageLog');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message';
+            messageDiv.innerHTML = `
+                <strong>${from}:</strong> 
+                <pre style="margin: 5px 0;">${message}</pre>
+                <span class="timestamp">${new Date().toLocaleTimeString()}</span>
+            `;
+            log.appendChild(messageDiv);
+            log.scrollTop = log.scrollHeight;
+        }
+    </script>
+</body>
+</html>
