@@ -1,4 +1,3 @@
-// src/services/metrics-service.ts
 import client from 'prom-client';
 import logger from './logger';
 

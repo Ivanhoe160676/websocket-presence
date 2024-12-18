@@ -122,7 +122,7 @@ export class WebSocketServer {
     // Close handler
     ws.on('close', async () => {
       if (ws.userId) {
-        metricsService.decrementConnections(); // Decrementar el gauge cuando se cierra la conexión
+        metricsService.decrementConnections(); 
         await this.presenceService.removeConnection(ws.userId, ws);
         logger.info(`Client disconnected - userId: ${ws.userId}`);
       }
