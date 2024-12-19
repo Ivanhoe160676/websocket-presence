@@ -3,19 +3,15 @@ FROM node:18-alpine AS base
 WORKDIR /usr/src/app
 RUN apk add --no-cache curl
 
-# Etapa de desarrollo
+# Etapa de desarrollo (opcional, si usas el contenedor solo para testing o desarrollo)
 FROM base AS development
-# Copiar archivos de configuración
 COPY package*.json ./
 COPY tsconfig.json ./
-# Instalar dependencias
 RUN npm install
-# Copiar código fuente
 COPY . .
-# Comando para desarrollo
 CMD ["npm", "run", "dev"]
 
-# Etapa de construcción
+# Etapa de construcción (para compilar y optimizar el código antes de llevarlo a producción)
 FROM base AS builder
 COPY package*.json ./
 COPY tsconfig.json ./
@@ -28,10 +24,10 @@ FROM base AS production
 COPY package*.json ./
 RUN npm ci --only=production
 COPY --from=builder /usr/src/app/dist ./dist
-# Copiar archivo de servicio de Firebase
 COPY firebase-service-account.json ./
-# Healthcheck
+
+# Healthcheck para asegurarnos de que el contenedor está funcionando correctamente
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:3000/health || exit 1
-# Comando para producción
+
 CMD ["node", "dist/index.js"]

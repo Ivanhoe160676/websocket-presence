@@ -35,7 +35,7 @@
 <body>
     <h1>WebSocket Test Client</h1>
     <div id="status" class="status disconnected">Disconnected</div>
-    <button onclick="connect()">Connect</button>
+    <button id="connectBtn" onclick="connect()">Connect</button>
     <button onclick="disconnect()">Disconnect</button>
     <hr>
     <input type="text" id="messageInput" placeholder="Type a message...">
@@ -53,12 +53,14 @@
                 document.getElementById('status').textContent = `Connected (${userId})`;
                 document.getElementById('status').className = 'status connected';
                 addMessage('System', `Connected with ID: ${userId}`);
+                document.getElementById('connectBtn').textContent = 'Reconnect';
             };
             
             ws.onclose = () => {
                 document.getElementById('status').textContent = 'Disconnected';
                 document.getElementById('status').className = 'status disconnected';
                 addMessage('System', 'Disconnected from server');
+                setTimeout(connect, 5000); // Auto reconnection after 5 seconds
             };
             
             ws.onmessage = (event) => {
@@ -85,9 +87,16 @@
             }
             
             const input = document.getElementById('messageInput');
+            const messageContent = input.value.trim();
+            
+            if (!messageContent) {
+                alert('Message cannot be empty!');
+                return;
+            }
+            
             const message = {
                 type: 'message',
-                content: input.value,
+                content: messageContent,
                 timestamp: new Date().toISOString()
             };
             

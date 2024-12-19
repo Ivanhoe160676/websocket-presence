@@ -81,6 +81,7 @@
     
     <div class="container">
         <div>
+            <!-- Connection Status Section -->
             <div class="card">
                 <h2>Connection Status</h2>
                 <div id="connectionStatus" class="status disconnected">Disconnected</div>
@@ -91,6 +92,7 @@
                 </div>
             </div>
 
+            <!-- Presence Status Section -->
             <div class="card">
                 <h2>Presence Status</h2>
                 <div class="controls">
@@ -103,12 +105,14 @@
                 </div>
             </div>
 
+            <!-- Online Users List Section -->
             <div class="card">
                 <h2>Online Users</h2>
                 <div id="presenceList"></div>
             </div>
         </div>
 
+        <!-- Message Log Section -->
         <div class="card">
             <h2>Message Log</h2>
             <div id="messageLog"></div>
@@ -116,9 +120,10 @@
     </div>
 
     <script>
-        let ws;
-        let heartbeatInterval;
+        let ws;  // WebSocket connection
+        let heartbeatInterval;  // To handle heartbeat intervals
 
+        // Connect to WebSocket server
         function connect() {
             const userId = document.getElementById('userId').value;
             if (!userId) {
@@ -128,35 +133,41 @@
 
             ws = new WebSocket(`ws://localhost:3000?userId=${userId}`);
             
+            // Handle WebSocket open event
             ws.onopen = () => {
                 updateConnectionStatus(true);
                 startHeartbeat();
-                logMessage('System', 'Connected to server');
+                logMessage('System', `Connected to server with user ID: ${userId}`);
             };
             
+            // Handle WebSocket close event
             ws.onclose = () => {
                 updateConnectionStatus(false);
                 stopHeartbeat();
                 logMessage('System', 'Disconnected from server');
             };
             
+            // Handle incoming messages from WebSocket
             ws.onmessage = (event) => {
                 const data = JSON.parse(event.data);
                 handleMessage(data);
             };
             
+            // Handle WebSocket errors
             ws.onerror = (error) => {
                 logMessage('Error', 'WebSocket error occurred');
                 console.error('WebSocket error:', error);
             };
         }
 
+        // Disconnect from WebSocket server
         function disconnect() {
             if (ws) {
                 ws.close();
             }
         }
 
+        // Update connection status in the UI
         function updateConnectionStatus(connected) {
             const status = document.getElementById('connectionStatus');
             const connectBtn = document.getElementById('connectBtn');
@@ -164,17 +175,20 @@
             const statusSelect = document.getElementById('statusSelect');
             const updateStatusBtn = document.getElementById('updateStatusBtn');
 
+            // Update status text and color based on connection state
             status.textContent = connected ? 'Connected' : 'Disconnected';
             status.className = `status ${connected ? 'connected' : 'disconnected'}`;
             
+            // Enable/Disable buttons based on connection state
             connectBtn.disabled = connected;
             disconnectBtn.disabled = !connected;
             statusSelect.disabled = !connected;
             updateStatusBtn.disabled = !connected;
         }
 
+        // Start sending heartbeats to keep connection alive
         function startHeartbeat() {
-            stopHeartbeat();
+            stopHeartbeat();  // Ensure no existing heartbeat is running
             heartbeatInterval = setInterval(() => {
                 if (ws && ws.readyState === WebSocket.OPEN) {
                     ws.send(JSON.stringify({
@@ -182,9 +196,10 @@
                         timestamp: new Date().toISOString()
                     }));
                 }
-            }, 15000);
+            }, 15000);  // Send every 15 seconds
         }
 
+        // Stop sending heartbeats
         function stopHeartbeat() {
             if (heartbeatInterval) {
                 clearInterval(heartbeatInterval);
@@ -192,6 +207,7 @@
             }
         }
 
+        // Update presence status on the server
         function updateStatus() {
             if (!ws || ws.readyState !== WebSocket.OPEN) {
                 alert('Not connected to server');
@@ -201,29 +217,31 @@
             const status = document.getElementById('statusSelect').value;
             ws.send(JSON.stringify({
                 type: 'presence_update',
-                payload: {
-                    status
-                },
+                payload: { status },
                 timestamp: new Date().toISOString()
             }));
         }
 
+        // Handle incoming messages from the WebSocket server
         function handleMessage(data) {
-        logMessage('Server', JSON.stringify(data, null, 2));
-        
-        if (data.type === 'presence_update') {
-            updatePresenceList(data.payload);
+            logMessage('Server', JSON.stringify(data, null, 2));
+            
+            // If the message is a presence update, update the presence list
+            if (data.type === 'presence_update') {
+                updatePresenceList(data.payload);
+            }
         }
-    }
 
+        // Update the presence list in the UI
         function updatePresenceList(presenceData) {
             const list = document.getElementById('presenceList');
             const userId = presenceData.userId;
             const existing = document.getElementById(`presence-${userId}`);
             
+            // If the user is already in the list, update or remove them
             if (existing) {
                 if (presenceData.status === 'offline') {
-                    existing.remove();
+                    existing.remove();  // Remove offline users
                 } else {
                     updatePresenceItem(existing, presenceData);
                 }
@@ -233,6 +251,7 @@
             }
         }
 
+        // Create a new presence item in the list
         function createPresenceItem(data) {
             const div = document.createElement('div');
             div.id = `presence-${data.userId}`;
@@ -241,16 +260,18 @@
             return div;
         }
 
+        // Update a presence item (status and user ID)
         function updatePresenceItem(element, data) {
-        element.innerHTML = `
-            <span>
-                <span class="status-indicator status-${data.status.toLowerCase()}"></span>
-                ${data.userId}
-            </span>
-            <span>${data.status}</span>
-        `;
-    }
+            element.innerHTML = `
+                <span>
+                    <span class="status-indicator status-${data.status.toLowerCase()}"></span>
+                    ${data.userId}
+                </span>
+                <span>${data.status}</span>
+            `;
+        }
 
+        // Log messages in the UI (for debugging)
         function logMessage(from, message) {
             const log = document.getElementById('messageLog');
             const messageDiv = document.createElement('div');
@@ -261,7 +282,7 @@
                 <span class="timestamp">${new Date().toLocaleTimeString()}</span>
             `;
             log.appendChild(messageDiv);
-            log.scrollTop = log.scrollHeight;
+            log.scrollTop = log.scrollHeight;  // Scroll to bottom
         }
     </script>
 </body>
